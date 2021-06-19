@@ -11,11 +11,11 @@ import matplotlib.pyplot as plt
 #  project related imports:
 import openseespy.opensees as ops
 
-from ground_motions import LoadGM
-from structural_models import ShearFrameVD5Story1Bay, ShearFrameVD1Story1Bay
-from control_devices import ActiveControl, PassiveTMD
-from analyses import Eigen, UniformExcitation
-from dl_models import NN
+# from ground_motions import LoadGM
+# from structural_models import ShearFrameVD5Story1Bay, ShearFrameVD1Story1Bay
+# from control_devices import ActiveControl, PassiveTMD
+# from analyses import Eigen, UniformExcitation
+# from dl_models import NN
 
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
@@ -26,8 +26,9 @@ from dl_models import NN
 
 
 class DQNAgent:
-    def __init__(self):
+    def __init__(self, structure, gm, analysis, dl_model, ctrl_device):
         self.structure = structure
+        self.gm = gm
         self.analysis = analysis
         self.dl_model = dl_model
         self.ctrl_device = ctrl_device
@@ -118,11 +119,11 @@ class DQNAgent:
     # #
 
     def step(self, itime, force):
-        self.analysis.run_dynamic("1-step", itime, force, gm, structure)
+        self.analysis.run_dynamic("1-step", itime, force, self.gm, self.structure)
 
-        next_state = np.array([], dtype=np.float32).reshape(0, structure.memory_len)
-        for key, value in analysis.sensors_log.items():
-            next_state = np.vstack((next_state, value[:, -structure.memory_len:]))
+        next_state = np.array([], dtype=np.float32).reshape(0, self.structure.memory_len)
+        for key, value in self.analysis.sensors_log.items():
+            next_state = np.vstack((next_state, value[:, -self.structure.memory_len:]))
 
         # if len(self.structure.obs_nodes) == 1:
         #     next_state = [
@@ -155,9 +156,9 @@ class DQNAgent:
         sma_vel = np.mean(self.analysis.ctrl_node_vel[-3:])
         sma_accel = np.mean(self.analysis.ctrl_node_accel[-3:])
         # max from uncontrolled
-        max_disp = max(np.abs(agent_unctrl.analysis.ctrl_node_disp))
-        max_vel = max(np.abs(agent_unctrl.analysis.ctrl_node_vel))
-        max_accel = max(np.abs(agent_unctrl.analysis.ctrl_node_accel))
+        max_disp = 1  # max(np.abs(agent_unctrl.analysis.ctrl_node_disp))
+        max_vel = 1  # max(np.abs(agent_unctrl.analysis.ctrl_node_vel))
+        max_accel = 1  # max(np.abs(agent_unctrl.analysis.ctrl_node_accel))
 
         #
 
@@ -202,11 +203,11 @@ class DQNAgent:
         color = 'tab:blue'
         ax2.set_ylabel('Displacement [mm]', color=color)  # we already handled the x-label with ax1
 
-        ax2.fill_between(agent_unctrl.analysis.time,
-                         -agent_unctrl.analysis.ctrl_node_disp_env, agent_unctrl.analysis.ctrl_node_disp_env,
-                         label="Uncontrolled_Env", color='blue', alpha=0.15)
-        ax2.plot(agent_unctrl.analysis.time, agent_unctrl.analysis.ctrl_node_disp, label="Uncontrolled", color='blue',
-                 alpha=0.85)
+        # ax2.fill_between(agent_unctrl.analysis.time,
+        #                  -agent_unctrl.analysis.ctrl_node_disp_env, agent_unctrl.analysis.ctrl_node_disp_env,
+        #                  label="Uncontrolled_Env", color='blue', alpha=0.15)
+        # ax2.plot(agent_unctrl.analysis.time, agent_unctrl.analysis.ctrl_node_disp, label="Uncontrolled", color='blue',
+        #          alpha=0.85)
         ax2.plot(self.analysis.time, self.analysis.ctrl_node_disp, label="Controlled", color='black')
         ax2.tick_params(axis='y', labelcolor=color)
 
@@ -247,7 +248,7 @@ class DQNAgent:
             while not done:
                 # self.env.render()
                 action = self.act(state)  # action = np.float(action[0][0]) for continuous
-                force = ctrl_device.calc_device_force(action)
+                force = self.ctrl_device.calc_device_force(action)
                 next_state = self.step(i_time, force).flatten()
                 next_state = np.reshape(next_state, [1, self.STATE_SIZE])  # (n,) --> (1,n)
 
@@ -258,10 +259,10 @@ class DQNAgent:
                 state = next_state
                 i_time += 1
                 # print(f"{i_time}/{gm.resampled_npts}")
-                done = i_time == gm.resampled_npts-1  # -1 for python indexing system
+                done = i_time == self.gm.resampled_npts-1  # -1 for python indexing system
                 # done = bool(done)
-                if i_time % (1 / gm.resampled_dt) == 0:
-                    if i_time % (10 / gm.resampled_dt) == 0:
+                if i_time % (1 / self.gm.resampled_dt) == 0:
+                    if i_time % (10 / self.gm.resampled_dt) == 0:
                         print('.', end='')
                     else:
                         print('|', end='')
@@ -292,45 +293,45 @@ class DQNAgent:
                     # print(iTime*GM.resampled_dt)
 
 
-if __name__ == "__main__":
-    # if not os.path.exists('Results'):
-    #     os.makedirs('Results')
-
-    gm = LoadGM(dt=0.01, t_final=40, g=9810, SF=0.5, inputFile='RSN1086_NORTHR_SYL090.AT2', outputFile='myEQ.dat',
-                plot=False)
-    sensors_loc = {"groundAccel": [1], "disp": [3], "vel": [3], "accel": [3]}  # future: strct = make("structure1")
-    structure = ShearFrameVD1Story1Bay(sensors_loc=sensors_loc, memory_len=1, ctrl_node=3, device_ij_nodes=[1, 3])
-    structure.create_model().draw2D().create_damping_matrix().run_gravity()  # gravity loading is defined part of structure
-
-    analysis = UniformExcitation(structure)
-    ctrl_device = ActiveControl(max_force=200, n_discrete=21)
-    # ctrl_device = SimpleMRD50kN(GM, max_volt=5, max_force=50, n_discrete=6)
-
-    # matTag, K_el, Cd, alpha = 10, 10, 10, 0.25
-    # ops.uniaxialMaterial('ViscousDamper', matTag, K_el, Cd, alpha)
-    # ctrl_device = PassiveTMD(loc_node=7, direction=1, m=10., mat_tag=10)
-    # ctrl_device.place_tmd()
-    # structure.create_damping_matrix()
-    # Create the controller model
-
-    dl_model = NN.simple_nn(n_units=10, n_hidden=5,
-                            input_shape=(structure.STATE_SIZE,),
-                            action_space=ctrl_device.action_space_discrete.n)
-
-    agent_unctrl = DQNAgent()  # to make sure it does not mix with controlled one below
-
-    run_steps = '1-step'  # do not change to 'full'
-    for i_time in range(0, gm.resampled_npts):
-        ctrl_force = 0.
-        agent_unctrl.analysis.run_dynamic(run_steps, i_time, ctrl_force, gm, structure)
-        if run_steps == 'full':
-            break
-
-    agent_unctrl.analysis.ctrl_node_disp_env = abs(hilbert(agent_unctrl.analysis.ctrl_node_disp))
-
-    # agent_unctrl.env.plot_TH()
-    ########################################
-    analysis = UniformExcitation(structure)  # re-initiate to avoid overwriting the uncontrolled response
-    agent_ctrl = DQNAgent()
-    agent_ctrl.run()
-    # ops.wipe()
+# if __name__ == "__main__":
+#     # if not os.path.exists('Results'):
+#     #     os.makedirs('Results')
+#
+#     gm = LoadGM(dt=0.01, t_final=40, g=9810, SF=0.5, inputFile='RSN1086_NORTHR_SYL090.AT2', outputFile='myEQ.dat',
+#                 plot=False)
+#     sensors_loc = {"groundAccel": [1], "disp": [3], "vel": [3], "accel": [3]}  # future: strct = make("structure1")
+#     structure = ShearFrameVD1Story1Bay(sensors_loc=sensors_loc, memory_len=1, ctrl_node=3, device_ij_nodes=[1, 3])
+#     structure.create_model().draw2D().create_damping_matrix().run_gravity()  # gravity loading is defined part of structure
+#
+#     analysis = UniformExcitation(structure)
+#     ctrl_device = ActiveControl(max_force=200, n_discrete=21)
+#     # ctrl_device = SimpleMRD50kN(GM, max_volt=5, max_force=50, n_discrete=6)
+#
+#     # matTag, K_el, Cd, alpha = 10, 10, 10, 0.25
+#     # ops.uniaxialMaterial('ViscousDamper', matTag, K_el, Cd, alpha)
+#     # ctrl_device = PassiveTMD(loc_node=7, direction=1, m=10., mat_tag=10)
+#     # ctrl_device.place_tmd()
+#     # structure.create_damping_matrix()
+#     # Create the controller model
+#
+#     dl_model = NN.simple_nn(n_units=10, n_hidden=5,
+#                             input_shape=(structure.STATE_SIZE,),
+#                             action_space=ctrl_device.action_space_discrete.n)
+#
+#     agent_unctrl = DQNAgent()  # to make sure it does not mix with controlled one below
+#
+#     run_steps = '1-step'  # do not change to 'full'
+#     for i_time in range(0, gm.resampled_npts):
+#         ctrl_force = 0.
+#         agent_unctrl.analysis.run_dynamic(run_steps, i_time, ctrl_force, gm, structure)
+#         if run_steps == 'full':
+#             break
+#
+#     agent_unctrl.analysis.ctrl_node_disp_env = abs(hilbert(agent_unctrl.analysis.ctrl_node_disp))
+#
+#     # agent_unctrl.env.plot_TH()
+#     ########################################
+#     analysis = UniformExcitation(structure)  # re-initiate to avoid overwriting the uncontrolled response
+#     agent_ctrl = DQNAgent()
+#     agent_ctrl.run()
+#     # ops.wipe()

@@ -1,10 +1,7 @@
 
 ##########################################################################################################################################################################
-import openseespy.opensees as ops
 import numpy as np
 import matplotlib.pyplot as plt
-import time
-import math
 from scipy import signal
 
 class LoadGM:
@@ -23,7 +20,7 @@ class LoadGM:
         dt = 0.0
         npts = 0
         self.signal = []
-        inFileID = open(self.inputFile, 'r')
+        inFileID = open('ground_motions\\assets\\'+self.inputFile, 'r')
         outFileID = open(self.outputFile, 'w')
 
         # Flag indicating dt is found and that ground motion
@@ -109,6 +106,9 @@ class LoadGM:
         # print(self.analysis_npts)
         if self.plot:
             plt.plot(self.resampled_time, self.resampled_signal)
+            plt.xlabel('Time')
+            plt.ylabel('Ground Acceleration [g]')
+            plt.title(self.inputFile)
             plt.show()
             # print(len(self.signal))
             # print(len(self.resampled_signal))
