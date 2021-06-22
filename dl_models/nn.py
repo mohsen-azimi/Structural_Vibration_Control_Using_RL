@@ -16,6 +16,7 @@ class NN:
 
     @staticmethod
     def simple_nn(n_hidden, n_units, input_shape, action_space):
+        print(input_shape)
         model = Sequential()
         for n in range(n_hidden):
             model.add(Dense(n_units, activation='relu', input_shape=input_shape))

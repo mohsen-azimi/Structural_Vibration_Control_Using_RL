@@ -1,22 +1,26 @@
+import os
 
+import numpy as np
 from scipy.signal import hilbert  # for envelop
-from ground_motions import LoadGM
-from structural_models import ShearFrameVD5Story1Bay, ShearFrameVD1Story1Bay
-from control_devices import ActiveControl, PassiveTMD
-from analyses import UniformExcitation
-from dl_models import NN
-from rl_algorithms import DQNAgent
 
+from analyses import UniformExcitation
+from control_devices import ActiveControl
+from dl_models import NN
+from ground_motions import LoadGM
+from rl_algorithms import DQNAgent
+from structural_models import ShearFrameVD1Story1Bay, DAQ
 
 if __name__ == "__main__":
-    # if not os.path.exists('Results'):
-    #     os.makedirs('Results')
+    if not os.path.exists('Results'):
+        os.makedirs('Results')
 
     gm = LoadGM(dt=0.01, t_final=15, g=9810, SF=0.5, inputFile='RSN1086_NORTHR_SYL090.AT2', outputFile='myEQ.dat',
                 plot=True)
-    sensors_loc = {"groundAccel": [1], "disp": [2, 3], "vel": [3], "accel": [3]}  # future: strct = make("structure1")
-    structure = ShearFrameVD5Story1Bay(sensors_loc=sensors_loc, memory_len=1, ctrl_node=3, device_ij_nodes=[1, 3])
+    sensors = DAQ(sensors_placement={"groundAccel": [1], "disp": [2], "vel": [2], "accel": [2]},
+                               window_size=1, ctrl_node=3)
+    structure = ShearFrameVD1Story1Bay(sensors, ctrl_device_ij_nodes=[1, 3])
     structure.create_model().draw2D().create_damping_matrix().run_gravity()  # gravity loading is defined part of structure
+
     analysis = UniformExcitation(structure)
     ctrl_device = ActiveControl(max_force=200, n_discrete=11)
     # ctrl_device = SimpleMRD50kN(GM, max_volt=5, max_force=50, n_discrete=6)
@@ -28,24 +32,24 @@ if __name__ == "__main__":
     # structure.create_damping_matrix()
     # Create the controller model
 
-    dl_model = NN.simple_nn(n_units=10, n_hidden=5,
-                            input_shape=(structure.STATE_SIZE,),
+    dl_model = NN.simple_nn(n_hidden=3, n_units=3,
+                            input_shape=(np.size(sensors.state),),
                             action_space=ctrl_device.action_space_discrete.n)
 
-    agent_unctrld = DQNAgent(structure, gm, analysis, dl_model, ctrl_device)  # to make sure it does not mix with controlled one below
+    agent_unctrld = DQNAgent(structure, sensors, gm, analysis, dl_model, ctrl_device)  # to make sure it does not mix with controlled one below
 
     run_steps = '1-step'  # do not change to 'full'
     for i_time in range(0, gm.resampled_npts):
         ctrl_force = 0.
-        agent_unctrld.analysis.run_dynamic(run_steps, i_time, ctrl_force, gm, structure)
+        agent_unctrld.analysis.run_dynamic(run_steps, i_time, ctrl_force, gm, structure, sensors)
         if run_steps == 'full':
             break
 
     agent_unctrld.analysis.ctrl_node_disp_env = abs(hilbert(agent_unctrld.analysis.ctrl_node_disp))
-
-    # agent_unctrl.env.plot_TH()
+    structure.unctrld_analysis = agent_unctrld.analysis
+    # agent_unctrld.env.plot_TH()
     ########################################
     analysis = UniformExcitation(structure)  # re-initiate to avoid overwriting the uncontrolled response
-    agent_ctrld = DQNAgent(structure, gm, analysis, dl_model, ctrl_device)
+    agent_ctrld = DQNAgent(structure, sensors, gm, analysis, dl_model, ctrl_device)
     agent_ctrld.run()
     # ops.wipe()

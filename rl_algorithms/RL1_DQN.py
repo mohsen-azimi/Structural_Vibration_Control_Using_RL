@@ -26,14 +26,17 @@ import openseespy.opensees as ops
 
 
 class DQNAgent:
-    def __init__(self, structure, gm, analysis, dl_model, ctrl_device):
+    def __init__(self, structure, sensors, gm, analysis, dl_model, ctrl_device):
+        # self.structure = structure
+        self.sensors = sensors
         self.structure = structure
         self.gm = gm
         self.analysis = analysis
         self.dl_model = dl_model
         self.ctrl_device = ctrl_device
 
-        self.STATE_SIZE = self.structure.STATE_SIZE
+        self.STATE_SIZE = np.size(self.sensors.state)
+
         self.ACTION_SIZE = ctrl_device.action_space_discrete.n
         self.nEPISODES = 1000  # EPISODES - number of games we want the agent to play.
         self.memory = deque(maxlen=4000)  # 2000  # memory>train_start
@@ -119,11 +122,12 @@ class DQNAgent:
     # #
 
     def step(self, itime, force):
-        self.analysis.run_dynamic("1-step", itime, force, self.gm, self.structure)
+        self.analysis.run_dynamic("1-step", itime, force, self.gm, self.structure, self.sensors)
 
-        next_state = np.array([], dtype=np.float32).reshape(0, self.structure.memory_len)
+
+        next_state = np.array([], dtype=np.float32).reshape(0, self.sensors.window_size)
         for key, value in self.analysis.sensors_log.items():
-            next_state = np.vstack((next_state, value[:, -self.structure.memory_len:]))
+            next_state = np.vstack((next_state, value[:, -self.sensors.window_size:]))
 
         # if len(self.structure.obs_nodes) == 1:
         #     next_state = [
@@ -203,11 +207,11 @@ class DQNAgent:
         color = 'tab:blue'
         ax2.set_ylabel('Displacement [mm]', color=color)  # we already handled the x-label with ax1
 
-        # ax2.fill_between(agent_unctrl.analysis.time,
-        #                  -agent_unctrl.analysis.ctrl_node_disp_env, agent_unctrl.analysis.ctrl_node_disp_env,
-        #                  label="Uncontrolled_Env", color='blue', alpha=0.15)
-        # ax2.plot(agent_unctrl.analysis.time, agent_unctrl.analysis.ctrl_node_disp, label="Uncontrolled", color='blue',
-        #          alpha=0.85)
+        ax2.fill_between(self.structure.unctrld_analysis.time,
+                         -self.structure.unctrld_analysis.ctrl_node_disp_env, self.structure.unctrld_analysis.ctrl_node_disp_env,
+                         label="Uncontrolled_Env", color='blue', alpha=0.15)
+        ax2.plot(self.structure.unctrld_analysis.time, self.structure.unctrld_analysis.ctrl_node_disp, label="Uncontrolled", color='blue',
+                 alpha=0.85)
         ax2.plot(self.analysis.time, self.analysis.ctrl_node_disp, label="Controlled", color='black')
         ax2.tick_params(axis='y', labelcolor=color)
 

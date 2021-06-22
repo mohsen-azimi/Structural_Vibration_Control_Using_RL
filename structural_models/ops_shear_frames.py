@@ -24,21 +24,28 @@ class ShearFrameVD1Story1Bay(object):
       Control Node ID = # ()
       """
 
-    def __init__(self, sensors_loc, memory_len, ctrl_node, device_ij_nodes):
+    def __init__(self, sensors, ctrl_device_ij_nodes):
         # Description
         self.env_name = "ShearFrameVD_5Story1Bay"
-        self.sensors_loc = sensors_loc  # The note to be controlled
-        self.memory_len = memory_len  # # window width (works like deque with len=window_size)
-        self.ctrl_node = ctrl_node  # The note to be controlled
-        self.device_ij_nodes = device_ij_nodes  # The node for which the displacement is minimized
+
+        self.sensors = sensors
+        # self.sensor_remember_window_len = sensor_remember_window_len
+        # self.ctrl_node = ctrl_node  # The note to be controlled
+        self.ctrl_device_ij_nodes = ctrl_device_ij_nodes  # The node for which the displacement is minimized
         self.units = 'kN-mm'
 
-        self.STATE_SIZE = 0
-        for key, value in sensors_loc.items():
-            if isinstance(value, list):
-                self.STATE_SIZE += len(value)
-        self.STATE_SIZE *= memory_len   # assume a 2d window slides through the records; then flatten to a vector
-        print(self.STATE_SIZE)
+        # self.STATE_SIZE = 0
+        # for key, value in sensors_placement.items():
+        #     if isinstance(value, list):
+        #         self.STATE_SIZE += len(value)
+        # self.STATE_SIZE *= sensor_remember_window_len   # assume a 2d window slides through the records; then flatten to a vector
+
+
+        # self.STATE_SHAPE = (len(self.sensors_placement), self.sensor_remember_window_len)
+        # self.STATE_SIZE = self.STATE_SHAPE[0]*self.STATE_SHAPE[1]
+        # print(self.STATE_SHAPE)
+        # print(self.STATE_SIZE)
+
     def draw2D(self):
         Visualization.draw2D()
         return self
@@ -120,20 +127,20 @@ class ShearFrameVD5Story1Bay(object):
       Control Node ID = # ()
       """
 
-    def __init__(self, sensors_loc, memory_len, ctrl_node, device_ij_nodes):
+    def __init__(self, sensors, ctrl_device_ij_nodes):
         # Description
         self.env_name = "ShearFrameVD_5Story1Bay"
-        self.sensors_loc = sensors_loc  # The note to be controlled
-        self.memory_len = memory_len  # # window width (works like deque with len=window_size)
-        self.ctrl_node = ctrl_node  # The note to be controlled
-        self.device_ij_nodes = device_ij_nodes  # The node for which the displacement is minimized
+        self.sensors = sensors  # The note to be controlled
+        # self.memory_len = memory_len  # # window width (works like deque with len=window_size)
+        # self.ctrl_node = ctrl_node  # The note to be controlled
+        self.ctrl_device_ij_nodes = ctrl_device_ij_nodes  # The node for which the displacement is minimized
         self.units = 'kN-mm'
 
-        self.STATE_SIZE = 0
-        for key, value in sensors_loc.items():
-            if isinstance(value, list):
-                self.STATE_SIZE += len(value)
-        self.STATE_SIZE *= memory_len   # assume a 2d window slides through the records; then flatten to a vector
+        # self.STATE_SIZE = 0
+        # for key, value in sensors_loc.items():
+        #     if isinstance(value, list):
+        #         self.STATE_SIZE += len(value)
+        # self.STATE_SIZE *= memory_len   # assume a 2d window slides through the records; then flatten to a vector
 
         # print("--------------")
         # print(self.STATE_SIZE)
