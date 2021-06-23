@@ -160,9 +160,9 @@ class DQNAgent:
         sma_vel = np.mean(self.analysis.ctrl_node_vel[-3:])
         sma_accel = np.mean(self.analysis.ctrl_node_accel[-3:])
         # max from uncontrolled
-        max_disp = 1  # max(np.abs(agent_unctrl.analysis.ctrl_node_disp))
-        max_vel = 1  # max(np.abs(agent_unctrl.analysis.ctrl_node_vel))
-        max_accel = 1  # max(np.abs(agent_unctrl.analysis.ctrl_node_accel))
+        max_disp = max(np.abs(self.structure.unctrld_analysis.ctrl_node_disp))
+        max_vel = max(np.abs(self.structure.unctrld_analysis.ctrl_node_vel))
+        max_accel = max(np.abs(self.structure.unctrld_analysis.ctrl_node_accel))
 
         #
 
@@ -185,7 +185,7 @@ class DQNAgent:
         else:
             k = 1.  # No extra penalty
 
-        return k * (rd+rv+ra)
+        return rd+rv+ra
 
     # def load(self, name):
     #     self.dl_model.load_weights(name)
