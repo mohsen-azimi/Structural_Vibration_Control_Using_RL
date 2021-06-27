@@ -8,14 +8,7 @@ from collections import deque
 from scipy.signal import hilbert  # for envelop
 import matplotlib.pyplot as plt
 
-#  project related imports:
 import openseespy.opensees as ops
-
-# from ground_motions import LoadGM
-# from structural_models import ShearFrameVD5Story1Bay, ShearFrameVD1Story1Bay
-# from control_devices import ActiveControl, PassiveTMD
-# from analyses import Eigen, UniformExcitation
-# from dl_models import NN
 
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
@@ -25,17 +18,17 @@ import openseespy.opensees as ops
 #     print("No GPU found")
 
 
-class DQNAgent:
-    def __init__(self, structure, sensors, gm, analysis, dl_model, ctrl_device):
-        # self.structure = structure
+class DQNAgent(object):
+    def __init__(self, structure, sensors, gm, analysis, dl_model, ctrl_device, uncontrolled_sensors):
+        self.gm = gm
         self.sensors = sensors
         self.structure = structure
-        self.gm = gm
         self.analysis = analysis
         self.dl_model = dl_model
         self.ctrl_device = ctrl_device
+        self.uncontrolled_sensors = uncontrolled_sensors
 
-        self.STATE_SIZE = np.size(self.sensors.state)
+        self.STATE_SIZE = sensors.n_sensors * sensors.window_size
 
         self.ACTION_SIZE = ctrl_device.action_space_discrete.n
         self.nEPISODES = 1000  # EPISODES - number of games we want the agent to play.
@@ -122,70 +115,65 @@ class DQNAgent:
     # #
 
     def step(self, itime, force):
-        self.analysis.run_dynamic("1-step", itime, force, self.gm, self.structure, self.sensors)
-
+        self.sensors, self.ctrl_device =\
+            self.analysis.run_dynamic("1-step", itime, self.ctrl_device, force, self.gm, self.sensors)
 
         next_state = np.array([], dtype=np.float32).reshape(0, self.sensors.window_size)
-        for key, value in self.analysis.sensors_log.items():
-            next_state = np.vstack((next_state, value[:, -self.sensors.window_size:]))
+        for key, value in self.sensors.sensors_history.items():
+            while value.shape[1] < self.sensors.window_size:  # add extra zeros if the window is still short
+                value = np.hstack((np.zeros((value.shape[0], 1)), value))
 
-        # if len(self.structure.obs_nodes) == 1:
-        #     next_state = [
-        #         self.analysis.obs_nodes_disp[0][i_time] / np.max(agent_unctrl.analysis.obs_nodes_disp[0]),
-        #         self.analysis.obs_nodes_disp[0][i_time - 1] / np.max(agent_unctrl.analysis.obs_nodes_disp[0]),
-        #         self.analysis.obs_nodes_disp[0][i_time - 2] / np.max(agent_unctrl.analysis.obs_nodes_disp[0]),
-        #         self.analysis.obs_nodes_vel[0][i_time] / np.max(agent_unctrl.analysis.obs_nodes_vel[0]),
-        #         self.analysis.obs_nodes_accel[0][i_time] / np.max(agent_unctrl.analysis.obs_nodes_accel[0]),
-        #         gm.resampled_signal[i_time]]  # ground motion is already scaled to g
-        # else:
-        #     next_state = [gm.resampled_signal[i_time]]
-        #     for node in range(len(self.structure.obs_nodes)):
-        #         nodestate = [self.analysis.obs_nodes_disp[node][i_time] / np.max(
-        #             agent_unctrl.analysis.obs_nodes_disp[node]),
-        #                      self.analysis.obs_nodes_disp[node][i_time - 1] / np.max(
-        #                          agent_unctrl.analysis.obs_nodes_disp[node]),
-        #                      self.analysis.obs_nodes_disp[node][i_time - 2] / np.max(
-        #                          agent_unctrl.analysis.obs_nodes_disp[node]),
-        #                      self.analysis.obs_nodes_vel[node][i_time] / np.max(
-        #                          agent_unctrl.analysis.obs_nodes_vel[node]),
-        #                      self.analysis.obs_nodes_accel[node][i_time] / np.max(
-        #                          agent_unctrl.analysis.obs_nodes_accel[node])]
-        #         next_state = np.concatenate((nodestate, next_state), axis=0)
+            next_state = np.vstack((next_state, value[:, -self.sensors.window_size:]))
+        # print(next_state)
 
         return next_state
 
     def reward(self, itime, force):
+
+        # For convenience, save control node history as separate variable
+        for key, value in self.sensors.sensors_placement.items():
+            if self.sensors.ctrl_node in value:
+                indx = value.index(self.sensors.ctrl_node)
+                self.sensors.ctrl_node_history[key] = self.sensors.sensors_history[key][indx]
+        # print(self.sensors.ctrl_node_history)
+
         # Simple Moving Average (SMA)
-        sma_disp = np.mean(self.analysis.ctrl_node_disp[-3:])
-        sma_vel = np.mean(self.analysis.ctrl_node_vel[-3:])
-        sma_accel = np.mean(self.analysis.ctrl_node_accel[-3:])
+        sma_disp, sma_vel, sma_accel = 0., 0., 0.
+        for key, value in self.sensors.ctrl_node_history.items():
+            if key == "disp":
+                sma_disp = np.mean(self.sensors.ctrl_node_history[key][-self.sensors.window_size:])
+            if key == "vel":
+                sma_vel = np.mean(self.sensors.ctrl_node_history[key][-self.sensors.window_size:])
+            if key == "accel":
+                sma_accel = np.mean(self.sensors.ctrl_node_history[key][-self.sensors.window_size:])
+
         # max from uncontrolled
-        max_disp = max(np.abs(self.structure.unctrld_analysis.ctrl_node_disp))
-        max_vel = max(np.abs(self.structure.unctrld_analysis.ctrl_node_vel))
-        max_accel = max(np.abs(self.structure.unctrld_analysis.ctrl_node_accel))
+        # max_disp = max(np.abs(self.structure.unctrld_analysis.ctrl_node_disp))
+        # max_vel = max(np.abs(self.structure.unctrld_analysis.ctrl_node_vel))
+        # max_accel = max(np.abs(self.structure.unctrld_analysis.ctrl_node_accel))
 
         #
 
-        k_g = abs(self.analysis.sensors_log["groundAccel"][0][-1]) / \
-            max(np.abs(self.analysis.sensors_log["groundAccel"][0]))  # coefficient 1
+        # k_g = abs(self.analysis.sensors_daq["groundAccel"][0][-1]) / \
+        #       max(np.abs(self.analysis.sensors_daq["groundAccel"][0]))  # coefficient 1
 
         # k_f = abs(force / ctrl_device.max_force)  # coefficient 2
 
         # print(f"k_g = {k_g}....k_f = {k_f}")
 
         # rd = abs(1/moving_ave_disp)
-        rd = 1 - abs(sma_disp / max_disp)
-        rv = 1 - abs(sma_vel / max_vel)
-        ra = 1 - abs(sma_accel / max_accel)
+        rd = 1 - abs(sma_disp / 1)
+        rv = 1 - abs(sma_vel / 1)
+        ra = 1 - abs(sma_accel / 1)
 
-        if (self.analysis.ctrl_node_disp[itime] * self.analysis.ctrl_node_vel[itime]) > 0:
-            k = 0.5  # Penalty: reverse the motion direction
-            if (force * self.analysis.ctrl_node_disp[itime]) > 0:
-                k *= 0.2  # More penalty: reverse the force direction
-        else:
-            k = 1.  # No extra penalty
+        # if (self.analysis.ctrl_node_disp[itime] * self.analysis.ctrl_node_vel[itime]) > 0:
+        #     k = 0.5  # Penalty: reverse the motion direction
+        #     if (force * self.analysis.ctrl_node_disp[itime]) > 0:
+        #         k *= 0.2  # More penalty: reverse the force direction
+        # else:
+        #     k = 1.  # No extra penalty
 
-        return rd+rv+ra
+        return rd + rv + ra
 
     # def load(self, name):
     #     self.dl_model.load_weights(name)
@@ -199,7 +187,7 @@ class DQNAgent:
         ax1.set_xlabel('Time [s]')
         ax1.set_ylabel('Force [kN]', color=color)
 
-        ax1.plot(self.analysis.time, self.analysis.force_memory, label="Force", color=color, alpha=0.3)
+        ax1.plot(self.ctrl_device.time, self.ctrl_device.force_history, label="Force", color=color, alpha=0.3)
         ax1.tick_params(axis='y', labelcolor=color)
         ax1.legend(loc='lower left')
 
@@ -207,12 +195,14 @@ class DQNAgent:
         color = 'tab:blue'
         ax2.set_ylabel('Displacement [mm]', color=color)  # we already handled the x-label with ax1
 
-        ax2.fill_between(self.structure.unctrld_analysis.time,
-                         -self.structure.unctrld_analysis.ctrl_node_disp_env, self.structure.unctrld_analysis.ctrl_node_disp_env,
+        ax2.fill_between(self.uncontrolled_sensors.time,
+                         -abs(hilbert(self.uncontrolled_sensors.ctrl_node_history['disp'])),
+                         abs(hilbert(self.uncontrolled_sensors.ctrl_node_history['disp'])),
                          label="Uncontrolled_Env", color='blue', alpha=0.15)
-        ax2.plot(self.structure.unctrld_analysis.time, self.structure.unctrld_analysis.ctrl_node_disp, label="Uncontrolled", color='blue',
-                 alpha=0.85)
-        ax2.plot(self.analysis.time, self.analysis.ctrl_node_disp, label="Controlled", color='black')
+        ax2.plot(self.uncontrolled_sensors.time, self.uncontrolled_sensors.ctrl_node_history['disp'],
+                 label="Uncontrolled", color='blue', alpha=0.85)
+        ax2.plot(self.sensors.time, self.sensors.ctrl_node_history['disp'],
+                 label="Controlled", color='black')
         ax2.tick_params(axis='y', labelcolor=color)
 
         plt.legend(loc='lower right')
@@ -233,7 +223,9 @@ class DQNAgent:
                     bbox_inches='tight', pad_inches=0.3, )
 
     def reset(self):
-        self.analysis.reset()  # reset each episode to avoid long appended time-histories
+        # self.analysis.time_reset()  # reset each episode to avoid long appended time-histories
+        self.sensors.time_reset()  # reset each episode to avoid long appended time-histories
+        self.ctrl_device.time_reset()  # reset each episode to avoid long appended time-histories
         ops.setTime(0.0)  # - gm.resampled_dt)
 
     def run(self):
@@ -263,7 +255,7 @@ class DQNAgent:
                 state = next_state
                 i_time += 1
                 # print(f"{i_time}/{gm.resampled_npts}")
-                done = i_time == self.gm.resampled_npts-1  # -1 for python indexing system
+                done = i_time == self.gm.resampled_npts - 1  # -1 for python indexing system
                 # done = bool(done)
                 if i_time % (1 / self.gm.resampled_dt) == 0:
                     if i_time % (10 / self.gm.resampled_dt) == 0:
@@ -295,7 +287,6 @@ class DQNAgent:
                 if i_time % self.BATCH_SIZE == 0:
                     self.replay()  # when to reply/train? when Done? per episode? per (originally, while not done at each step)
                     # print(iTime*GM.resampled_dt)
-
 
 # if __name__ == "__main__":
 #     # if not os.path.exists('Results'):

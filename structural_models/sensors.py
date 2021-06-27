@@ -18,25 +18,31 @@ import numpy as np
 # from collections import deque
 
 
-class DAQ(object):
+class Sensors(object):
     """
       """
-
     def __init__(self, sensors_placement, window_size, ctrl_node):
         # Description
         self.sensors_placement = sensors_placement  # The note to be controlled
+        self.sensors_history = {}  # data acquisition/logger
         self.window_size = window_size
+
+        self.n_sensors = 0
+        for key, value in self.sensors_placement.items():
+            self.n_sensors += len(value)
+
         self.ctrl_node = ctrl_node  # The note to be controlled
+        self.ctrl_node_history = {}
         self.units = 'kN-mm'
 
-        # self.STATE_SIZE = 0
-        # for key, value in sensors_placement.items():
-        #     if isinstance(value, list):
-        #         self.STATE_SIZE += len(value)
-        # self.STATE_SIZE *= sensor_remember_window_len   # assume a 2d window slides through the records; then flatten to a vector
+        self.time_reset()
 
-        # Pre-allocattion for state matrix
-        self.state = np.zeros((len(self.sensors_placement), self.window_size), dtype=np.float64)
+    def time_reset(self):
+        self.time = [0.]
+        for key, value in self.sensors_placement.items():
+            self.sensors_history[key] = np.zeros((len(value), 1), dtype=np.float64)
+            # self.ctrl_node_history[key] = np.zeros((1, 1), dtype=np.float64)
+
 
 
 

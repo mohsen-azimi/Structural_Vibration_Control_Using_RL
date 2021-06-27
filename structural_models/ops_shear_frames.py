@@ -9,6 +9,8 @@ from structural_models.ops_damping import Rayliegh
 import numpy as np
 import matplotlib.pyplot as plt
 from structural_models.visualization import Visualization
+from termcolor import colored  # for colorful prints
+
 import time
 import math
 from scipy import signal
@@ -24,14 +26,14 @@ class ShearFrameVD1Story1Bay(object):
       Control Node ID = # ()
       """
 
-    def __init__(self, sensors, ctrl_device_ij_nodes):
+    def __init__(self):
         # Description
         self.env_name = "ShearFrameVD_5Story1Bay"
 
-        self.sensors = sensors
+        # self.sensors = sensors
         # self.sensor_remember_window_len = sensor_remember_window_len
         # self.ctrl_node = ctrl_node  # The note to be controlled
-        self.ctrl_device_ij_nodes = ctrl_device_ij_nodes  # The node for which the displacement is minimized
+        # self.ctrl_device_ij_nodes = ctrl_device_ij_nodes  # The node for which the displacement is minimized
         self.units = 'kN-mm'
 
         # self.STATE_SIZE = 0
@@ -39,7 +41,6 @@ class ShearFrameVD1Story1Bay(object):
         #     if isinstance(value, list):
         #         self.STATE_SIZE += len(value)
         # self.STATE_SIZE *= sensor_remember_window_len   # assume a 2d window slides through the records; then flatten to a vector
-
 
         # self.STATE_SHAPE = (len(self.sensors_placement), self.sensor_remember_window_len)
         # self.STATE_SIZE = self.STATE_SHAPE[0]*self.STATE_SHAPE[1]
@@ -55,26 +56,26 @@ class ShearFrameVD1Story1Bay(object):
         ops.wipe()
         ops.model('basic', '-ndm', 2, '-ndf', 3)
 
-        h = 3000.0   # story height
-        w = 5000.0   # bay width
+        h = 3000.0  # story height
+        w = 5000.0  # bay width
         # mass
-        m = 1000/9810  # kN/g (per floor)
+        m = 1000 / 9810  # kN/g (per floor)
 
         # story 0
-        ops.node(1, 0.0, 0*h)
-        ops.node(2, w, 0*h)
+        ops.node(1, 0.0, 0 * h)
+        ops.node(2, w, 0 * h)
         ops.fix(1, 1, 1, 1)
         ops.fix(2, 1, 1, 1)
         # story 1
-        ops.node(3, 0.0, 1*h, '-mass', 0.5*m, 0.0, 0.0)
-        ops.node(4, w, 1*h, '-mass', 0.5*m, 0.0, 0.0)
+        ops.node(3, 0.0, 1 * h, '-mass', 0.5 * m, 0.0, 0.0)
+        ops.node(4, w, 1 * h, '-mass', 0.5 * m, 0.0, 0.0)
 
         K = 8.  # stiffness per story (just an assumption)
         E = 200.  # kN/mm2
 
-        Ic = 0.55 * K * (h**3) / (24*E)    # mm^4 (K=24 EI/h^3) two columns
-        Ib = 1e11 * Ic   # almost rigid
-        A = 1e11  #mm^2  (no axial deformation)
+        Ic = 0.55 * K * (h ** 3) / (24 * E)  # mm^4 (K=24 EI/h^3) two columns
+        Ib = 1e11 * Ic  # almost rigid
+        A = 1e11  # mm^2  (no axial deformation)
 
         transfTag = 1
         ops.geomTransf('Linear', transfTag)
@@ -93,11 +94,17 @@ class ShearFrameVD1Story1Bay(object):
         # ops.element('twoNodeLink', 4, *[1, 4], '-mat', matTag, '-dir', *[1])
         return self
 
+    def install_TMD_if_any(self, ctrl_device):
+        if ctrl_device.device_type is "passiveTMD":
+            ctrl_device.place_tmd()
+            print(colored('Passive TMD', 'green'), colored('Installed!', 'green'))
+        else:
+            print(colored('No TMD', 'red'), colored('Installed!', 'red'))
+        return self
 
     def create_damping_matrix(self):
         Rayliegh(xDamp=0.05, alphaM=0.00, betaKcurr=0.0, betaKinit=0.0).create_damping_matrix()
         return self
-
 
     def run_gravity(self):
         # apply control force (static), u, at floor1
@@ -127,13 +134,13 @@ class ShearFrameVD5Story1Bay(object):
       Control Node ID = # ()
       """
 
-    def __init__(self, sensors, ctrl_device_ij_nodes):
+    def __init__(self):
         # Description
         self.env_name = "ShearFrameVD_5Story1Bay"
-        self.sensors = sensors  # The note to be controlled
+        # self.sensors = sensors  # The note to be controlled
         # self.memory_len = memory_len  # # window width (works like deque with len=window_size)
         # self.ctrl_node = ctrl_node  # The note to be controlled
-        self.ctrl_device_ij_nodes = ctrl_device_ij_nodes  # The node for which the displacement is minimized
+        # self.ctrl_device_ij_nodes = ctrl_device_ij_nodes  # The node for which the displacement is minimized
         self.units = 'kN-mm'
 
         # self.STATE_SIZE = 0
@@ -145,50 +152,59 @@ class ShearFrameVD5Story1Bay(object):
         # print("--------------")
         # print(self.STATE_SIZE)
 
-
         # self.STATE_SIZE = len(obs_nodes) * 5 + 1  # 5 for the list above + GM
 
     def draw2D(self):
         Visualization.draw2D()
         return self
 
-
     def create_model(self):
         # Reference: https://opensees.berkeley.edu/wiki/index.php/OpenSees_Example_1b._Elastic_Portal_Frame (E1b)
         ops.wipe()
         ops.model('basic', '-ndm', 2, '-ndf', 3)
 
-        h = 3000.0   # story height
-        w = 5000.0   # bay width
+        h = 3000.0  # story height
+        w = 5000.0  # bay width
         # mass
-        m = 1000/9810  # kN/g (per floor)
+        m = 1000 / 9810  # kN/g (per floor)
 
         # story 0
-        ops.node(1, 0.0, 0*h); ops.fix(1, 1, 1, 1)
-        ops.node(2, w, 0*h); ops.fix(2, 1, 1, 1)
+        ops.node(1, 0.0, 0 * h);
+        ops.fix(1, 1, 1, 1)
+        ops.node(2, w, 0 * h);
+        ops.fix(2, 1, 1, 1)
         # story 1
-        ops.node(3, 0.0, 1*h); ops.mass(3, 0.5*m, 0.0, 0.0)
-        ops.node(4, w, 1*h); ops.mass(4, 0.5*m, 0.0, 0.0)
+        ops.node(3, 0.0, 1 * h);
+        ops.mass(3, 0.5 * m, 0.0, 0.0)
+        ops.node(4, w, 1 * h);
+        ops.mass(4, 0.5 * m, 0.0, 0.0)
         # story 2
-        ops.node(5, 0.0, 2 * h); ops.mass(5, 0.5 * m, 0.0, 0.0)
-        ops.node(6, w, 2 * h); ops.mass(6, 0.5 * m, 0.0, 0.0)
+        ops.node(5, 0.0, 2 * h);
+        ops.mass(5, 0.5 * m, 0.0, 0.0)
+        ops.node(6, w, 2 * h);
+        ops.mass(6, 0.5 * m, 0.0, 0.0)
         # story 3
-        ops.node(7, 0.0, 3 * h); ops.mass(7, 0.5 * m, 0.0, 0.0)
-        ops.node(8, w, 3 * h); ops.mass(8, 0.5 * m, 0.0, 0.0)
+        ops.node(7, 0.0, 3 * h);
+        ops.mass(7, 0.5 * m, 0.0, 0.0)
+        ops.node(8, w, 3 * h);
+        ops.mass(8, 0.5 * m, 0.0, 0.0)
         # story 4
-        ops.node(9, 0.0, 4 * h); ops.mass(9, 0.5 * m, 0.0, 0.0)
-        ops.node(10, w, 4 * h); ops.mass(10, 0.5 * m, 0.0, 0.0)
+        ops.node(9, 0.0, 4 * h);
+        ops.mass(9, 0.5 * m, 0.0, 0.0)
+        ops.node(10, w, 4 * h);
+        ops.mass(10, 0.5 * m, 0.0, 0.0)
         # story 5
-        ops.node(11, 0.0, 5 * h); ops.mass(11, 0.5 * m, 0.0, 0.0)
-        ops.node(12, w, 5 * h); ops.mass(12, 0.5 * m, 0.0, 0.0)
+        ops.node(11, 0.0, 5 * h);
+        ops.mass(11, 0.5 * m, 0.0, 0.0)
+        ops.node(12, w, 5 * h);
+        ops.mass(12, 0.5 * m, 0.0, 0.0)
 
         K = 8  # stiffness per story (just an assumption)
         E = 200  # kN/mm2
 
-        Ic = 0.5 * K * (h**3) / (24*E)    # mm^4 (K=24 EI/h^3) two columns
-        Ib = 1e12 * Ic   # almost rigid
-        A = 1e12  #mm^2  (no axial deformation)
-
+        Ic = 0.5 * K * (h ** 3) / (24 * E)  # mm^4 (K=24 EI/h^3) two columns
+        Ib = 1e12 * Ic  # almost rigid
+        A = 1e12  # mm^2  (no axial deformation)
 
         transfTag = 1
         ops.geomTransf('Linear', transfTag)
@@ -220,7 +236,7 @@ class ShearFrameVD5Story1Bay(object):
         ops.element('elasticBeamColumn', 15, 11, 12, A, E, Ib, transfTag)  # Beam
 
         # Two Node Link Element (dampers)
-        # Damper properties: https://openseespydoc.readthedocs.io/en/latest/src/ViscousDamper.html?highlight=viscousdamper
+        # Damper prop: https://openseespydoc.readthedocs.io/en/latest/src/ViscousDamper.html?highlight=viscousdamper
         matTag = 1
         Kd, Cd, alpha, = 25.0, 20.7452, 0.35
         ops.uniaxialMaterial('ViscousDamper', matTag, Kd, Cd, alpha)
@@ -229,7 +245,14 @@ class ShearFrameVD5Story1Bay(object):
         ops.element('twoNodeLink', 18, *[5, 8], '-mat', matTag, '-dir', *[1])
         ops.element('twoNodeLink', 19, *[7, 10], '-mat', matTag, '-dir', *[1])
         ops.element('twoNodeLink', 20, *[9, 12], '-mat', matTag, '-dir', *[1])
+        return self
 
+    def install_TMD_if_any(self, ctrl_device):
+        if ctrl_device.device_type is "passiveTMD":
+            ctrl_device.place_tmd()
+            print(colored('Passive TMD', 'green'), colored('Installed!', 'green'))
+        else:
+            print(colored('No TMD', 'red'), colored('Installed!', 'red'))
         return self
 
     def create_damping_matrix(self):
@@ -283,8 +306,3 @@ class ShearFrameVD5Story1Bay(object):
 #             break
 #     opsEnv.plot_TH()
 #
-
-
-
-
-

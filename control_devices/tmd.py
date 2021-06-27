@@ -14,7 +14,7 @@ class PassiveTMD:
     Active control using DQN
     """
     def __init__(self, loc_node, direction, m, mat_tag):
-        self.device_type = "passive"
+        self.device_type = "passiveTMD"
         self.nodes = [loc_node, loc_node+1]  # pre-define the i-j nodes (j node would change below)
         self.nodes_coord = ops.nodeCoord(loc_node)
         self.dir = direction

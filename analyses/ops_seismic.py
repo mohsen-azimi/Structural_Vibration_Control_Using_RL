@@ -7,40 +7,22 @@ import openseespy.opensees as ops
 import numpy as np
 
 
-class UniformExcitation:
+class UniformExcitation(object):
     """
       """
-    def __init__(self, structure):
+    def __init__(self):
         self.type = "UniformExcitation"
-        self.structure = structure
-        self.sensors_log = {}
-        for key, value in structure.sensors.sensors_placement.items():
-            self.sensors_log[key] = np.zeros((len(value), 1), dtype=np.float64)
+        # self.time_reset()
 
-        self.time = [0.]
-        self.ctrl_node_disp = [0.]
-        self.ctrl_node_vel = [0.]
-        self.ctrl_node_accel = [0.]
-        self.force_memory = [0.]
-
-    def reset(self):
-        self.time = [0.]
-        for key, value in self.sensors_log.items():
-            self.sensors_log[key] = np.zeros((len(value), 1), dtype=np.float64)
-
-        self.time = [0.]
-        self.ctrl_node_disp = [0.]
-        self.ctrl_node_vel = [0.]
-        self.ctrl_node_accel = [0.]
-        self.force_memory = [0.]
+    # def time_reset(self):
+    #     self.time = [0.]
 
     def plot_disp_TH(self):
         # PlotResults.plot_disp_TH()
         pass
         # return self
 
-    def run_dynamic(self, run_steps, i_time, ctrl_force, gm, structure, sensors):
-
+    def run_dynamic(self, run_steps, i_time, ctrl_device, ctrl_force, gm, sensors):
         if run_steps == 'full':
             ops.wipeAnalysis()
             # applying Dynamic Ground motion analysis
@@ -60,36 +42,32 @@ class UniformExcitation:
             for ii in range(0, gm.resampled_npts):
                 ops.analyze(1, gm.resampled_dt)
 
-                self.time.append(ops.getTime())
-                self.ctrl_node_disp.append(ops.nodeDisp(sensors.ctrl_node, 1))
-                self.ctrl_node_vel.append(ops.nodeVel(sensors.ctrl_node, 1))
-                self.ctrl_node_accel.append(ops.nodeAccel(sensors.ctrl_node, 1))
-                # self.force_memory.append(ctrl_force)
+                sensors.time.append(ops.getTime())
+
+                ctrl_device.time.append(ops.getTime())
+                ctrl_device.force_history.append(ctrl_force)
 
                 for key, value in sensors.sensors_placement.items():
                     if key == "groundAccel":
                         accel_g = np.zeros((len(sensors.sensors_placement["groundAccel"]), 1), dtype=np.float64)
                         for i, node in enumerate(value):
                             accel_g[i] = gm.resampled_signal[i_time]  # would raise error for i_time!
-                        self.sensors_log["groundAccel"] = np.hstack((self.sensors_log["groundAccel"], accel_g))
+                        sensors.sensors_history["groundAccel"] = np.hstack((sensors.sensors_history["groundAccel"], accel_g))
                     if key == "disp":
                         disp = np.zeros((len(sensors.sensors_placement["disp"]), 1), dtype=np.float64)
                         for i, node in enumerate(value):
                             disp[i] = ops.nodeDisp(node, 1)
-                        self.sensors_log["disp"] = np.hstack((self.sensors_log["disp"], disp))
+                        sensors.sensors_history["disp"] = np.hstack((sensors.sensors_history["disp"], disp))
                     if key == "vel":
                         vel = np.zeros((len(sensors.sensors_placement["vel"]), 1), dtype=np.float64)
                         for i, node in enumerate(value):
                             vel[i] = ops.nodeVel(node, 1)
-                        self.sensors_log["vel"] = np.hstack((self.sensors_log["vel"], vel))
+                        sensors.sensors_history["vel"] = np.hstack((sensors.sensors_history["vel"], vel))
                     if key == "accel":
                         accel = np.zeros((len(sensors.sensors_placement["accel"]), 1), dtype=np.float64)
                         for i, node in enumerate(value):
                             accel[i] = ops.nodeAccel(node, 1)
-                        self.sensors_log["accel"] = np.hstack((self.sensors_log["accel"], accel))
-
-
-
+                        sensors.sensors_history["accel"] = np.hstack((sensors.sensors_history["accel"], accel))
         else:
             # apply control force, u, at floor1
             ops.wipeAnalysis()
@@ -112,13 +90,13 @@ class UniformExcitation:
             ops.timeSeries('Constant', F_tsTag_i, '-factor', -ctrl_force)
             ops.remove('loadPattern', F_patternTag_i)
             ops.pattern('Plain', F_patternTag_i, F_tsTag_i)
-            ops.load(self.structure.ctrl_device_ij_nodes[0], 1, 0., 0.)
+            ops.load(ctrl_device.ctrl_device_ij_nodes[0], 1, 0., 0.)
 
             ops.remove('timeSeries', F_tsTag_j)
             ops.timeSeries('Constant', F_tsTag_j, '-factor', ctrl_force)
             ops.remove('loadPattern', F_patternTag_j)
             ops.pattern('Plain', F_patternTag_j, F_tsTag_j)
-            ops.load(self.structure.ctrl_device_ij_nodes[1], 1, 0., 0.)
+            ops.load(ctrl_device.ctrl_device_ij_nodes[1], 1, 0., 0.)
 
             ops.wipeAnalysis()
             ops.constraints('Plain')
@@ -131,40 +109,36 @@ class UniformExcitation:
 
             ops.analyze(1, gm.resampled_dt)
 
-            self.time.append(ops.getTime())
-            self.ctrl_node_disp.append(ops.nodeDisp(sensors.ctrl_node, 1))
-            self.ctrl_node_vel.append(ops.nodeVel(sensors.ctrl_node, 1))
-            self.ctrl_node_accel.append(ops.nodeAccel(sensors.ctrl_node, 1))
-            self.force_memory.append(ctrl_force)
+            sensors.time.append(ops.getTime())
+
+            ctrl_device.time.append(ops.getTime())
+            ctrl_device.force_history.append(ctrl_force)
 
             for key, value in sensors.sensors_placement.items():
                 if key == "groundAccel":
                     accel_g = np.zeros((len(sensors.sensors_placement["groundAccel"]), 1), dtype=np.float64)
                     for i, node in enumerate(value):
                         accel_g[i] = gm.resampled_signal[i_time-1]
-                    self.sensors_log["groundAccel"] = np.hstack((self.sensors_log["groundAccel"], accel_g))
-                    # print(self.sensors_log["groundAccel"])
+                    sensors.sensors_history["groundAccel"] = np.hstack((sensors.sensors_history["groundAccel"], accel_g))
                 if key == "disp":
                     disp = np.zeros((len(sensors.sensors_placement["disp"]), 1), dtype=np.float64)
                     for i, node in enumerate(value):
                         disp[i] = ops.nodeDisp(node, 1)
-                        # print(f"disp={ops.nodeDisp(node, 1)}")
-
-                    self.sensors_log["disp"] = np.hstack((self.sensors_log["disp"], disp))
+                    sensors.sensors_history["disp"] = np.hstack((sensors.sensors_history["disp"], disp))
                 if key == "vel":
                     vel = np.zeros((len(sensors.sensors_placement["vel"]), 1), dtype=np.float64)
                     for i, node in enumerate(value):
                         vel[i] = ops.nodeVel(node, 1)
-                    self.sensors_log["vel"] = np.hstack((self.sensors_log["vel"], vel))
+                    sensors.sensors_history["vel"] = np.hstack((sensors.sensors_history["vel"], vel))
                 if key == "accel":
                     accel = np.zeros((len(sensors.sensors_placement["accel"]), 1), dtype=np.float64)
                     for i, node in enumerate(value):
                         accel[i] = ops.nodeAccel(node, 1)
-                    self.sensors_log["accel"] = np.hstack((self.sensors_log["accel"], accel))
+                    sensors.sensors_history["accel"] = np.hstack((sensors.sensors_history["accel"], accel))
 
             # ops.loadConst()
             ops.wipeAnalysis()
-
+        return sensors, ctrl_device
     # def render(self, mode='human', SF=1.0):
     #     screen_width = 600
     #     screen_height = 400

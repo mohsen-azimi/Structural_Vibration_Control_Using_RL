@@ -1,6 +1,6 @@
 from structural_models.ops_shear_frames import ShearFrameVD5Story1Bay
 from structural_models.ops_shear_frames import ShearFrameVD1Story1Bay
-from structural_models.sensors import DAQ
+from structural_models.sensors import Sensors
 from structural_models.ops_damping import Rayliegh
 
 
