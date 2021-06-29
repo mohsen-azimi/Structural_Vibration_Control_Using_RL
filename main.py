@@ -30,33 +30,32 @@ if __name__ == "__main__":
     # ctrl_device = PassiveTMD(loc_node=7, direction=1, m=10., mat_tag=10)
 
     structure = ShearFrameVD1Story1Bay()
-    structure.create_model().install_TMD_if_any(ctrl_device).draw2D()
+    structure.create_model().draw2D()
     structure.create_damping_matrix().run_gravity()  # gravity loading is defined part of structure
 
     sensors = Sensors(sensors_placement={"groundAccel": [1], "accel": [3, 4], "vel": [3], "disp": [3]},
-                      window_size=3, ctrl_node=3)
+                       window_size=3, ctrl_node=3)
 
     analysis = UniformExcitation()
-
-    # Create the controller model
     dl_model = NN.simple_nn(n_hidden=10, n_units=15,
                             input_shape=(sensors.n_sensors * sensors.window_size,),
                             action_space=ctrl_device.action_space_discrete.n)
 
-    uncontrolled = DQNAgent(structure, sensors, gm, analysis, dl_model, ctrl_device,
-                            uncontrolled_sensors=None)
-    # print(sensors.__dict__)
     run_steps = '1-step'  # do not change to 'full'
     for i_time in range(0, gm.resampled_npts):
         ctrl_force = 0.
-        sensors, ctrl_device = uncontrolled.analysis.run_dynamic(run_steps, i_time, ctrl_device, ctrl_force, gm,
-                                                                 sensors)
+        sensors, ctrl_device = analysis.run_dynamic(run_steps, i_time, ctrl_device, ctrl_force, gm,
+                                                     sensors)
         if run_steps == 'full':
             break
-    ########################################
+    uncontrolled_ctrl_node_history = sensors.ctrl_node_history
 
-    analysis = UniformExcitation()  # re-initiate to avoid overwriting the uncontrolled response
+    ########################################
+    analysis = UniformExcitation()
+    sensors = Sensors(sensors_placement={"groundAccel": [1], "accel": [3, 4], "vel": [3], "disp": [3]},
+                      window_size=3, ctrl_node=3)
+
     dqn_controlled = DQNAgent(structure, sensors, gm, analysis, dl_model, ctrl_device,
-                              uncontrolled_sensors=sensors)
+                              uncontrolled_ctrl_node_history=uncontrolled_ctrl_node_history)
     dqn_controlled.run()
     # ops.wipe()

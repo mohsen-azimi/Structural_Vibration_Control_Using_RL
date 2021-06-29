@@ -38,7 +38,7 @@ class Sensors(object):
         self.time_reset()
 
     def time_reset(self):
-        self.time = [0.]
+        self.sensors_history['time'] = [0.]
         for key, value in self.sensors_placement.items():
             self.sensors_history[key] = np.zeros((len(value), 1), dtype=np.float64)
             # self.ctrl_node_history[key] = np.zeros((1, 1), dtype=np.float64)

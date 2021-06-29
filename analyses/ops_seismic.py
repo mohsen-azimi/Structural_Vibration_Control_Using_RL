@@ -42,7 +42,8 @@ class UniformExcitation(object):
             for ii in range(0, gm.resampled_npts):
                 ops.analyze(1, gm.resampled_dt)
 
-                sensors.time.append(ops.getTime())
+                # sensors.time.append(ops.getTime())
+                sensors.sensors_history['time'].append(ops.getTime())
 
                 ctrl_device.time.append(ops.getTime())
                 ctrl_device.force_history.append(ctrl_force)
@@ -68,6 +69,14 @@ class UniformExcitation(object):
                         for i, node in enumerate(value):
                             accel[i] = ops.nodeAccel(node, 1)
                         sensors.sensors_history["accel"] = np.hstack((sensors.sensors_history["accel"], accel))
+
+                # For convenience, save control node history as separate variable
+                sensors.ctrl_node_history['time'] = sensors.sensors_history['time']
+                for key, value in sensors.sensors_placement.items():
+                    if sensors.ctrl_node in value:
+                        indx = value.index(sensors.ctrl_node)
+                        sensors.ctrl_node_history[key] = sensors.sensors_history[key][indx]
+
         else:
             # apply control force, u, at floor1
             ops.wipeAnalysis()
@@ -109,7 +118,8 @@ class UniformExcitation(object):
 
             ops.analyze(1, gm.resampled_dt)
 
-            sensors.time.append(ops.getTime())
+            # sensors.time.append(ops.getTime())
+            sensors.sensors_history['time'].append(ops.getTime())
 
             ctrl_device.time.append(ops.getTime())
             ctrl_device.force_history.append(ctrl_force)
@@ -135,6 +145,13 @@ class UniformExcitation(object):
                     for i, node in enumerate(value):
                         accel[i] = ops.nodeAccel(node, 1)
                     sensors.sensors_history["accel"] = np.hstack((sensors.sensors_history["accel"], accel))
+
+            # For convenience, save control node history as separate variable
+            sensors.ctrl_node_history['time'] = sensors.sensors_history['time']
+            for key, value in sensors.sensors_placement.items():
+                if sensors.ctrl_node in value:
+                    indx = value.index(sensors.ctrl_node)
+                    sensors.ctrl_node_history[key] = sensors.sensors_history[key][indx]
 
             # ops.loadConst()
             ops.wipeAnalysis()

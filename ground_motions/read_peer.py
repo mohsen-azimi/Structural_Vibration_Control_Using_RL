@@ -16,7 +16,6 @@ class LoadGM:
         self.outputFile = outputFile
         self.plot = plot
 
-    # readPEER(self)
         dt = 0.0
         npts = 0
         self.signal = []

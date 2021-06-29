@@ -19,14 +19,14 @@ import openseespy.opensees as ops
 
 
 class DQNAgent(object):
-    def __init__(self, structure, sensors, gm, analysis, dl_model, ctrl_device, uncontrolled_sensors):
+    def __init__(self, structure, sensors, gm, analysis, dl_model, ctrl_device, uncontrolled_ctrl_node_history):
         self.gm = gm
         self.sensors = sensors
         self.structure = structure
         self.analysis = analysis
         self.dl_model = dl_model
         self.ctrl_device = ctrl_device
-        self.uncontrolled_sensors = uncontrolled_sensors
+        self.uncontrolled_ctrl_node_history = uncontrolled_ctrl_node_history
 
         self.STATE_SIZE = sensors.n_sensors * sensors.window_size
 
@@ -115,42 +115,37 @@ class DQNAgent(object):
     # #
 
     def step(self, itime, force):
-        self.sensors, self.ctrl_device =\
-            self.analysis.run_dynamic("1-step", itime, self.ctrl_device, force, self.gm, self.sensors)
+        self.sensors, self.ctrl_device = self.analysis.run_dynamic("1-step", itime, self.ctrl_device, force, self.gm,
+                                                                   self.sensors)
 
         next_state = np.array([], dtype=np.float32).reshape(0, self.sensors.window_size)
         for key, value in self.sensors.sensors_history.items():
-            while value.shape[1] < self.sensors.window_size:  # add extra zeros if the window is still short
-                value = np.hstack((np.zeros((value.shape[0], 1)), value))
+            if not key == 'time':  # skip the time array
+                while value.shape[1] < self.sensors.window_size:  # add extra zeros if the window is still short
+                    value = np.hstack((np.zeros((value.shape[0], 1)), value))
 
-            next_state = np.vstack((next_state, value[:, -self.sensors.window_size:]))
+                next_state = np.vstack((next_state, value[:, -self.sensors.window_size:]))
+
         # print(next_state)
 
         return next_state
 
     def reward(self, itime, force):
-
-        # For convenience, save control node history as separate variable
-        for key, value in self.sensors.sensors_placement.items():
-            if self.sensors.ctrl_node in value:
-                indx = value.index(self.sensors.ctrl_node)
-                self.sensors.ctrl_node_history[key] = self.sensors.sensors_history[key][indx]
-        # print(self.sensors.ctrl_node_history)
-
+        # @mohsen: make Reward object with J1-J9 methods!
         # Simple Moving Average (SMA)
-        sma_disp, sma_vel, sma_accel = 0., 0., 0.
+        ave_disp, ave_vel, ave_accel = 0., 0., 0.
         for key, value in self.sensors.ctrl_node_history.items():
             if key == "disp":
-                sma_disp = np.mean(self.sensors.ctrl_node_history[key][-self.sensors.window_size:])
+                ave_disp = np.mean(self.sensors.ctrl_node_history[key][-self.sensors.window_size:])
             if key == "vel":
-                sma_vel = np.mean(self.sensors.ctrl_node_history[key][-self.sensors.window_size:])
+                ave_vel = np.mean(self.sensors.ctrl_node_history[key][-self.sensors.window_size:])
             if key == "accel":
-                sma_accel = np.mean(self.sensors.ctrl_node_history[key][-self.sensors.window_size:])
+                ave_accel = np.mean(self.sensors.ctrl_node_history[key][-self.sensors.window_size:])
 
         # max from uncontrolled
-        # max_disp = max(np.abs(self.structure.unctrld_analysis.ctrl_node_disp))
-        # max_vel = max(np.abs(self.structure.unctrld_analysis.ctrl_node_vel))
-        # max_accel = max(np.abs(self.structure.unctrld_analysis.ctrl_node_accel))
+        max_disp = max(np.abs(self.uncontrolled_ctrl_node_history['disp']))
+        max_vel = max(np.abs(self.uncontrolled_ctrl_node_history['vel']))
+        max_accel = max(np.abs(self.uncontrolled_ctrl_node_history['accel']))
 
         #
 
@@ -162,9 +157,9 @@ class DQNAgent(object):
         # print(f"k_g = {k_g}....k_f = {k_f}")
 
         # rd = abs(1/moving_ave_disp)
-        rd = 1 - abs(sma_disp / 1)
-        rv = 1 - abs(sma_vel / 1)
-        ra = 1 - abs(sma_accel / 1)
+        rd = 1 - abs(ave_disp / max_disp)
+        rv = 1 - abs(ave_vel / max_vel)
+        ra = 1 - abs(ave_accel / max_accel)
 
         # if (self.analysis.ctrl_node_disp[itime] * self.analysis.ctrl_node_vel[itime]) > 0:
         #     k = 0.5  # Penalty: reverse the motion direction
@@ -195,13 +190,13 @@ class DQNAgent(object):
         color = 'tab:blue'
         ax2.set_ylabel('Displacement [mm]', color=color)  # we already handled the x-label with ax1
 
-        ax2.fill_between(self.uncontrolled_sensors.time,
-                         -abs(hilbert(self.uncontrolled_sensors.ctrl_node_history['disp'])),
-                         abs(hilbert(self.uncontrolled_sensors.ctrl_node_history['disp'])),
+        ax2.fill_between(self.uncontrolled_ctrl_node_history['time'],
+                         -abs(hilbert(self.uncontrolled_ctrl_node_history['disp'])),
+                         abs(hilbert(self.uncontrolled_ctrl_node_history['disp'])),
                          label="Uncontrolled_Env", color='blue', alpha=0.15)
-        ax2.plot(self.uncontrolled_sensors.time, self.uncontrolled_sensors.ctrl_node_history['disp'],
+        ax2.plot(self.uncontrolled_ctrl_node_history['time'], self.uncontrolled_ctrl_node_history['disp'],
                  label="Uncontrolled", color='blue', alpha=0.85)
-        ax2.plot(self.sensors.time, self.sensors.ctrl_node_history['disp'],
+        ax2.plot(self.sensors.ctrl_node_history['time'], self.sensors.ctrl_node_history['disp'],
                  label="Controlled", color='black')
         ax2.tick_params(axis='y', labelcolor=color)
 
