@@ -147,8 +147,6 @@ class DQNAgent(object):
         max_vel = max(np.abs(self.uncontrolled_ctrl_node_history['vel']))
         max_accel = max(np.abs(self.uncontrolled_ctrl_node_history['accel']))
 
-        #
-
         # k_g = abs(self.analysis.sensors_daq["groundAccel"][0][-1]) / \
         #       max(np.abs(self.analysis.sensors_daq["groundAccel"][0]))  # coefficient 1
 
