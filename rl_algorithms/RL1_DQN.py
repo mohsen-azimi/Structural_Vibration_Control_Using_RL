@@ -9,7 +9,7 @@ from scipy.signal import hilbert  # for envelop
 import matplotlib.pyplot as plt
 
 import openseespy.opensees as ops
-
+from rl_algorithms.RewardFcns import Reward
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 # if tf.test.gpu_device_name():
@@ -41,7 +41,7 @@ class DQNAgent(object):
         self.BATCH_SIZE = 1000  # <=train start; batch_size - Determines how much memory DQN will use to learn
         self.GAMMA = 0.95  # discount rate, to calculate the future discounted reward.
         self.epsilon = 1.0  # exploration rate at start
-        self.EPSILON_DECAY = 0.9999  # we want to decrease the number of explorations as it gets better.
+        self.EPSILON_DECAY = 0.999  # we want to decrease the number of explorations as it gets better.
         self.EPSILON_MIN = 0.01  # we want the agent to explore at least this amount.
 
     def remember(self, state, action, reward, next_state, done):
@@ -130,49 +130,50 @@ class DQNAgent(object):
 
         return next_state
 
-    def reward(self, itime, force):
-        # @mohsen: make Reward object with J1-J9 methods!
-        # Simple Moving Average (SMA)
-        ave_disp, ave_vel, ave_accel = 0., 0., 0.
-        for key, value in self.sensors.ctrl_node_history.items():
-            if key == "disp":
-                ave_disp = np.mean(self.sensors.ctrl_node_history[key][-self.sensors.window_size:])
-            if key == "vel":
-                ave_vel = np.mean(self.sensors.ctrl_node_history[key][-self.sensors.window_size:])
-            if key == "accel":
-                ave_accel = np.mean(self.sensors.ctrl_node_history[key][-self.sensors.window_size:])
-
-        # max from uncontrolled
-        max_disp = max(np.abs(self.uncontrolled_ctrl_node_history['disp']))
-        max_vel = max(np.abs(self.uncontrolled_ctrl_node_history['vel']))
-        max_accel = max(np.abs(self.uncontrolled_ctrl_node_history['accel']))
-
-        # k_g = abs(self.analysis.sensors_daq["groundAccel"][0][-1]) / \
-        #       max(np.abs(self.analysis.sensors_daq["groundAccel"][0]))  # coefficient 1
-
-        # k_f = abs(force / ctrl_device.max_force)  # coefficient 2
-
-        # print(f"k_g = {k_g}....k_f = {k_f}")
-
-        # rd = abs(1/moving_ave_disp)
-        rd = 1 - abs(ave_disp / max_disp)
-        rv = 1 - abs(ave_vel / max_vel)
-        ra = 1 - abs(ave_accel / max_accel)
-
-        # if (self.analysis.ctrl_node_disp[itime] * self.analysis.ctrl_node_vel[itime]) > 0:
-        #     k = 0.5  # Penalty: reverse the motion direction
-        #     if (force * self.analysis.ctrl_node_disp[itime]) > 0:
-        #         k *= 0.2  # More penalty: reverse the force direction
-        # else:
-        #     k = 1.  # No extra penalty
-
-        return rd + rv + ra
+    # def reward(self, itime, force):
+    #     # @mohsen: make Reward object with J1-J9 methods!
+    #     # Simple Moving Average (SMA)
+    #     ave_disp, ave_vel, ave_accel = 0., 0., 0.
+    #     for key, value in self.sensors.ctrl_node_history.items():
+    #         if key == "disp":
+    #             ave_disp = np.mean(self.sensors.ctrl_node_history[key][-self.sensors.window_size:])
+    #         if key == "vel":
+    #             ave_vel = np.mean(self.sensors.ctrl_node_history[key][-self.sensors.window_size:])
+    #         if key == "accel":
+    #             ave_accel = np.mean(self.sensors.ctrl_node_history[key][-self.sensors.window_size:])
+    #
+    #     # max from uncontrolled
+    #     max_disp = max(np.abs(self.uncontrolled_ctrl_node_history['disp']))
+    #     max_vel = max(np.abs(self.uncontrolled_ctrl_node_history['vel']))
+    #     max_accel = max(np.abs(self.uncontrolled_ctrl_node_history['accel']))
+    #
+    #     # k_g = abs(self.analysis.sensors_daq["groundAccel"][0][-1]) / \
+    #     #       max(np.abs(self.analysis.sensors_daq["groundAccel"][0]))  # coefficient 1
+    #
+    #     # k_f = abs(force / ctrl_device.max_force)  # coefficient 2
+    #
+    #     # print(f"k_g = {k_g}....k_f = {k_f}")
+    #
+    #     # rd = abs(1/moving_ave_disp)
+    #     rd = 1 - abs(ave_disp / max_disp)
+    #     rv = 1 - abs(ave_vel / max_vel)
+    #     ra = 1 - abs(ave_accel / max_accel)
+    #
+    #     # if (self.analysis.ctrl_node_disp[itime] * self.analysis.ctrl_node_vel[itime]) > 0:
+    #     #     k = 0.5  # Penalty: reverse the motion direction
+    #     #     if (force * self.analysis.ctrl_node_disp[itime]) > 0:
+    #     #         k *= 0.2  # More penalty: reverse the force direction
+    #     # else:
+    #     #     k = 1.  # No extra penalty
+    #
+    #     return rd
 
     # def load(self, name):
     #     self.dl_model.load_weights(name)
 
     def save(self, name):
         self.dl_model.save_weights(name)
+
 
     def plot_dqn(self, episode):
         fig, (ax1, ax3) = plt.subplots(2, 1)  # 1, 2, figsize=(15, 8))
@@ -211,9 +212,9 @@ class DQNAgent(object):
         fig.tight_layout()  # otherwise the right y-label is slightly clipped
         plt.show()
 
-        plt.savefig(f"Results/Plots/DQN_episode_{episode}.png", facecolor='w', edgecolor='w',
-                    orientation='landscape', format="png", transparent=False,
-                    bbox_inches='tight', pad_inches=0.3, )
+        # plt.savefig(f"Results/Plots/DQN_episode_{episode}.png", facecolor='w', edgecolor='w',
+        #             orientation='landscape', format="png", transparent=False,
+        #             bbox_inches='tight', pad_inches=0.3, )
 
     def reset(self):
         # self.analysis.time_reset()  # reset each episode to avoid long appended time-histories
@@ -241,7 +242,8 @@ class DQNAgent(object):
                 next_state = self.step(i_time, force).flatten()
                 next_state = np.reshape(next_state, [1, self.STATE_SIZE])  # (n,) --> (1,n)
 
-                reward = self.reward(i_time, force)
+                # reward = self.reward(i_time, force)
+                reward = Reward.J1(self.sensors, self.uncontrolled_ctrl_node_history)
                 ep_rewards.append(reward)
 
                 self.remember(state, action, reward, next_state, done)
@@ -267,11 +269,11 @@ class DQNAgent(object):
 
                     if episode % 10 == 0:
                         print(f"Saving DQN_episode_{episode}.hdf5...")
-                        self.save(f"Results/Weights/DQN_episode_{episode}.hdf5")
-
-                        scipy.io.savemat(f"Results/MATLAB/DQN_episode_{episode}.mat", {
-                            'Rewards': ep_rewards
-                        })
+                        # self.save(f"Results/Weights/DQN_episode_{episode}.hdf5")
+                        #
+                        # scipy.io.savemat(f"Results/MATLAB/DQN_episode_{episode}.mat", {
+                        #     'Rewards': ep_rewards
+                        # })
 
                         if episode == self.nEPISODES:
                             return
