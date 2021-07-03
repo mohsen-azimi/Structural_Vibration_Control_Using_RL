@@ -4,17 +4,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
 
-class LoadGM:
 
-    def __init__(self, dt, t_final, g, SF,  inputFile, outputFile, plot):
-        self.resampled_dt = dt
+class LoadGM:
+    def __init__(self, parameters):
+        self.resampled_dt = parameters['desired_dt']
         self.dir = 1  # for opensees
-        self.t_final = t_final  # truncate ground motion to save time during training
-        self.g = g
-        self.SF = SF*self.g #applied during opensees run, not here
-        self.inputFile = inputFile
-        self.outputFile = outputFile
-        self.plot = plot
+        self.t_end = parameters['t_end']  # truncate ground motion to save time during training
+        self.g = parameters['g']
+        self.SF = parameters['scale_factor'] *self.g #applied during opensees run, not here
+        self.inputFile = parameters['inputFile']
+        self.outputFile = 'ground_motions\\current_gm.dat'
+        self.plot = parameters['plot']
 
         dt = 0.0
         npts = 0
@@ -93,7 +93,7 @@ class LoadGM:
 
 
         # delete time-steps beyound t_final
-        self.resampled_npts = int(t_final/self.resampled_dt)
+        self.resampled_npts = int(self.t_end/self.resampled_dt)
         self.resampled_signal = self.resampled_signal[0:self.resampled_npts]
         self.resampled_time = self.resampled_time[0:self.resampled_npts]
         # print(len(self.resampled_signal))
@@ -117,5 +117,5 @@ class LoadGM:
         outFileID.close()
 
 # Test Class
-if __name__ == "__main__":
-    GM = LoadGM(dt=0.02, t_final=20, g=386., SF=1., inputFile='RSN1086_NORTHR_SYL090.AT2', outputFile='myEQ.dat', plot=True)
+# if __name__ == "__main__":
+#     GM = LoadGM(dt=0.02, t_final=20, g=386., SF=1., inputFile='RSN1086_NORTHR_SYL090.AT2', outputFile='myEQ.dat', plot=True)

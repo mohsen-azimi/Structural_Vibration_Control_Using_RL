@@ -15,18 +15,14 @@ import gym
 from collections import deque
 
 
-class ControlDevice(object):
-    """
-    Active control using DQN
-    """
-
-    def __init__(self, max_force, n_discrete, ctrl_device_ij_nodes):
+class ActiveControlDevice(object):
+    def __init__(self, parameters):
         self.time = [0.]
         self.force_history = [0.]  # applied control force history
         self.device_type = "active"
-        self.ctrl_device_ij_nodes = ctrl_device_ij_nodes
-        self.max_force = max_force
-        self.action_space_discrete = gym.spaces.Discrete(n_discrete)  # for discrete DQN
+        self.ctrl_device_ij_nodes = parameters['ctrl_device_ij_nodes']
+        self.max_force = parameters['max_force']
+        self.action_space_discrete = gym.spaces.Discrete(parameters['n_discrete'])  # for discrete DQN
         self.action_space_discrete_array = np.linspace(-self.max_force, self.max_force,
                                                        num=self.action_space_discrete.n)
         self.action_space_continuous = gym.spaces.Discrete(1)
