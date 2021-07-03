@@ -108,10 +108,9 @@ class LoadGM:
             plt.xlabel('Time')
             plt.ylabel('Ground Acceleration [g]')
             plt.title(self.inputFile)
+            plt.savefig('ground_motions\\current_gm.jpeg', dpi=150)
             plt.show()
-            # print(len(self.signal))
-            # print(len(self.resampled_signal))
-            # print(self.analysis_npts)
+
 
         inFileID.close()
         outFileID.close()

@@ -34,7 +34,7 @@ if __name__ == "__main__":
                     'epsilon_initial': 1.0,
                     'epsilon_decay': 0.996,
                     'epsilon_min': 0.1,
-                    'dqn_params': {'n_hidden': 5, 'n_units': 64, 'lr': 5e-4,
+                    'dqn_params': {'n_hidden': 5, 'n_units': 5, 'lr': 5e-4,
                                    'input_shape': (env.sensors.n_sensors * env.sensors.window_size,),
                                    'n_actions': env.ctrl_device.action_space_discrete.n}}
     agent = DQNAgent(agent_params, env_params)
@@ -98,7 +98,7 @@ if __name__ == "__main__":
 
                 # self.env.plot_TH('1-step')
             if i_timer % agent.BATCH_SIZE == 0:
-                agent.learn()  # when to reply/train? when Done? per episode? per (originally, while not done at each step)
+                agent.learn()  # when to learn? when Done? per episode? per (originally, while not done at each step)
                 # print(iTime*GM.resampled_dt)
 
     # agent = DQNAgent(structure, sensors, gm, analysis, dl_model, ctrl_device,

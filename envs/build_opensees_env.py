@@ -4,6 +4,7 @@ https://opensees.berkeley.edu/wiki/index.php/Dynamic_Analyses_of_1-Story_Moment_
 '''
 ##########################################################################################################################################################################
 import openseespy.opensees as ops
+import copy
 # import openseespy.postprocessing.ops_vis as opsv
 from structural_models.ops_damping import Rayliegh
 import numpy as np
@@ -77,15 +78,16 @@ class ShearFrame(object):
 
     def record_uncontrolled_response(self):
 
-        sens = self.sensors
-        ana = self.analysis
-        ctrl_dev = self.ctrl_device
-        for i_time in range(0, self.gm.resampled_npts):
-            ctrl_force = 0.
-            sens, ctrl_dev = ana.run_dynamic('1-step', i_time, ctrl_dev, ctrl_force, self.gm,
-                                             sens)
+        sensors = copy.deepcopy(self.sensors)
+        analysis = copy.deepcopy(self.analysis)
+        ctrl_device = copy.deepcopy(self.ctrl_device)
 
-        self.uncontrolled_ctrl_node_history = sens.ctrl_node_history
+        for i_timer in range(0, self.gm.resampled_npts):
+            ctrl_force = 0.
+            sensors, ctrl_device = analysis.run_dynamic('1-step', i_timer, ctrl_device, ctrl_force, self.gm,
+                                                        sensors)
+
+        self.uncontrolled_ctrl_node_history = sensors.ctrl_node_history
 
     def reset(self):
         # self.analysis.time_reset()  # reset each episode to avoid long appended time-histories

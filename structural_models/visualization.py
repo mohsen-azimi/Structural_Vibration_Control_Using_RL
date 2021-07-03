@@ -49,9 +49,7 @@ class Visualization:
         ax.set_xlabel('X-axis')
         ax.set_ylabel('Y-axis')
         ax.set_title('2D Model')
-        plt.savefig('Model2D.jpeg', dpi=500)
-        plt.show()
-
+        plt.savefig('structural_models\\Model2D.jpeg', dpi=150)
         plt.show()
 
 
