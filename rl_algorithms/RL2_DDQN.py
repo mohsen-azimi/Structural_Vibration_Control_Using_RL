@@ -53,7 +53,7 @@ from keras.optimizers import Adam, RMSprop
 #     return model
 
 
-class DDQNAgent:
+class DoubleDQNAgent:
     def __init__(self, structure, sensors, gm, analysis, dl_model, ctrl_device, uncontrolled_ctrl_node_history):
         self.gm = gm
         self.sensors = sensors

@@ -15,7 +15,7 @@ from analyses import UniformExcitation
 from control_devices import ActiveControlDevice
 from dl_models import NN
 from ground_motions import LoadGM
-from rl_algorithms import DQNAgent, DDQNAgent
+from rl_algorithms import DQNAgent  # , DDQNAgent
 from structural_models import ShearFrameVD1Story1Bay, Sensors
 import time
 import math
@@ -35,7 +35,7 @@ class ShearFrame(object):
 
         self.structure = None
         self.sensors = None
-        self.ctrl_devices = None
+        self.ctrl_device = None
         self.gm = None
         self.analysis = None
 
@@ -95,11 +95,12 @@ class ShearFrame(object):
         self.ctrl_device.time_reset()  # reset each episode to avoid long appended time-histories
         ops.setTime(0.0)  # - gm.resampled_dt)
 
-    def step(self, itimer, force):
+    def step(self, itimer, force, normalize):
         self.sensors, self.ctrl_device = self.analysis.run_dynamic("1-step", itimer, self.ctrl_device, force, self.gm,
                                                                    self.sensors)
 
         next_state = np.array([], dtype=np.float32).reshape(0, self.sensors.window_size)
+
         for key, value in self.sensors.sensors_history.items():
             if not key == 'time':  # skip the time array
                 while value.shape[1] < self.sensors.window_size:  # add extra zeros if the window is still short
@@ -107,5 +108,7 @@ class ShearFrame(object):
 
                 next_state = np.vstack((next_state, value[:, -self.sensors.window_size:]))
 
+        if normalize:
+            print(f"normalize_state = {normalize}")
         return next_state
         # pass
