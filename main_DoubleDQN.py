@@ -1,7 +1,20 @@
+"""
+pip uninstall keras -y
+pip uninstall keras-nightly -y
+pip uninstall keras-Preprocessing -y
+pip uninstall keras-vis -y
+pip uninstall tensorflow -y
+
+pip install tensorflow==2.3.0
+pip install keras==2.4
+"""
+
+
+
 import itertools
 
 import numpy as np
-from rl_algorithms import DQNAgent, Reward
+from rl_algorithms import DoubleDQNAgent, Reward
 import utils
 import envs
 
@@ -9,12 +22,12 @@ if __name__ == "__main__":
     utils.make_dir({'Results': ['MATLAB', 'Plots', 'Weights']})
 
     env_params = {'structure': {'name': 'Shear_Frame_1Bay1Story',
-                                'plot': False},
+                                'plot': True},
 
                   'sensors': {'sensors_placement': {'groundAccel': [1], 'accel': [3], 'vel': [3], 'disp': [3]},
                               'window_size': 3, 'ctrl_node': 3},
 
-                  'control_devices': {'ActiveControl': {'max_force': 400, 'n_discrete': 51,
+                  'control_devices': {'ActiveControl': {'max_force': 100, 'n_discrete': 51,
                                                         'ctrl_device_ij_nodes': [1, 3]}},
 
                   'ground_motion': {'desired_dt': 0.01,
@@ -22,24 +35,26 @@ if __name__ == "__main__":
                                     'g': 9810,
                                     'scale_factor': 2.0,
                                     'inputFile': 'RSN1086_NORTHR_SYL090.AT2',
-                                    'plot': False},
+                                    'plot': True},
 
                   'analysis': 'UniformExcitation',
                   }
     env = envs.ShearFrame(env_params)
 
-    agent_params = {'n_episodes': 500,
+    agent_params = {'n_episodes': 1000,
                     'replay_buffer_len': 4000,
                     'train_start': 2000,
                     'batch_size': 1000,
-                    'discount_factor': 0.95,
-                    'epsilon_initial': 1.0,
-                    'epsilon_decay': 0.95,
+                    'gamma': 0.95,            # discount rate
+                    'epsilon_initial': 1.0,   # exploration rate
+                    'epsilon_decay': 0.999,
                     'epsilon_min': 0.1,
+                    'soft_update': False,
+                    'soft_update_tau': 0.1, # target network soft update hyper-parameter
                     'dqn_params': {'n_hidden': 3, 'n_units': 64, 'lr': 5e-4,
                                    'input_shape': (env.sensors.n_sensors * env.sensors.window_size,),
                                    'n_actions': env.ctrl_device.action_space_discrete.n}}
-    agent = DQNAgent(agent_params)
+    agent = DoubleDQNAgent(agent_params)
 
     aggr_ep_rewards = []
     episodes = []
@@ -79,6 +94,8 @@ if __name__ == "__main__":
                     print('|', end='')
 
             if done:
+                agent.update_target_net()  # every step update target model
+
                 episodes.append(episode)
                 aggr_ep_rewards.append(np.sum(ep_rewards))
 
@@ -99,7 +116,7 @@ if __name__ == "__main__":
 
 
                 # self.env.plot_TH('1-step')
-            if i_timer % 4000 == 0:  #  % agent.BATCH_SIZE == 0:
+            if i_timer % 1000 == 0:  #  % agent.BATCH_SIZE == 0:
                 agent.learn()  # when to learn? when Done? per episode? per (originally, while not done at each step)
                 # print(iTime*GM.resampled_dt)
 

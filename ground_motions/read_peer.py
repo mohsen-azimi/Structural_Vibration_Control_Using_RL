@@ -91,7 +91,6 @@ class LoadGM:
         self.resampled_signal = signal.resample(self.signal, self.resampled_npts)
         self.resampled_time = np.linspace(0, self.resampled_npts*self.resampled_dt, int(self.resampled_npts*self.resampled_dt/self.resampled_dt), endpoint=True)  # analysis time-step
 
-
         # delete time-steps beyound t_final
         self.resampled_npts = int(self.t_end/self.resampled_dt)
         self.resampled_signal = self.resampled_signal[0:self.resampled_npts]

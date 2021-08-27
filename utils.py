@@ -50,6 +50,6 @@ def plot_dqn(episode, episodes, ctrl_device, uncontrolled_ctrl_node_history, sen
     fig.tight_layout()  # otherwise the right y-label is slightly clipped
     plt.show()
 
-    # plt.savefig(f"Results/Plots/DQN_episode_{episode}.png", facecolor='w', edgecolor='w',
-    #             orientation='landscape', format="png", transparent=False,
-    #             bbox_inches='tight', pad_inches=0.3, )
+    plt.savefig(f"Results/Plots/DQN_episode_{episode}.png", facecolor='w', edgecolor='w',
+                orientation='landscape', format="png", transparent=False,
+                bbox_inches='tight', pad_inches=0.3, )

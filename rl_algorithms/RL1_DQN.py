@@ -5,17 +5,17 @@ import tensorflow as tf
 import scipy.io
 import gym
 import random
-import pandas as pd
+# import pandas as pd
 from collections import deque
-from scipy.signal import hilbert  # for envelop
-import matplotlib.pyplot as plt
-import openseespy.opensees as ops
-from rl_algorithms.RewardFcns import Reward
-from keras.layers import Dense, Activation
-from keras.models import Sequential, load_model
-from keras.optimizers import Adam
+# from scipy.signal import hilbert  # for envelop
+# import matplotlib.pyplot as plt
+# import openseespy.opensees as ops
+# from rl_algorithms.RewardFcns import Reward
+# from keras.layers import Dense, Activation
+# from keras.models import Sequential, load_model
+# from keras.optimizers import Adam
 import numpy as np
-import torch
+# import torch
 from dl_models import NN
 
 
@@ -73,7 +73,7 @@ class DQNAgent(object):
         self.replay_buffer = deque(maxlen=dqn_params['replay_buffer_len'])  # 2000  # memory>train_start
         self.TRAIN_START = dqn_params['train_start']  # <= memory len ((train starts when reach this))
         self.BATCH_SIZE = dqn_params['batch_size']  # <=train start; batch_size - how much memory DQN will use to learn
-        self.GAMMA = dqn_params['discount_factor']  # discount rate, to calculate the future discounted reward.
+        self.GAMMA = dqn_params['gamma']  # discount rate, to calculate the future discounted reward.
         self.epsilon = dqn_params['epsilon_initial']  # exploration rate at start
         self.EPSILON_DECAY = dqn_params['epsilon_decay']  # decrease the number of explorations as it gets better.
         self.EPSILON_MIN = dqn_params['epsilon_min']  # we want the agent to explore at least this amount.
@@ -145,7 +145,8 @@ class DQNAgent(object):
         #         targets[j][actions[j]] = rewards[j] + self.GAMMA * (np.amax(target_nexts[j]))
 
         # Train the Neural Network with batches
-        targets = rewards + self.GAMMA * (1 - dones) * (np.amax(target_nexts))
+        q_max = np.squeeze(np.amax(target_nexts, axis=2))  # a vector of all q max
+        targets = rewards + self.GAMMA * (1 - dones) * q_max
 
         self.target_net.fit(states, targets, epochs=1, batch_size=self.BATCH_SIZE, verbose=0)
         if self.epsilon > self.EPSILON_MIN:

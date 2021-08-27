@@ -25,7 +25,7 @@ from ground_motions.read_peer import LoadGM
 from gym import spaces, logger
 from collections import deque
 
-from structural_models import ShearFrameVD1Story1Bay, Sensors
+from structural_models import ShearFrameVD1Story1Bay, ShearFrameVD5Story1Bay, Sensors
 
 
 class ShearFrame(object):
